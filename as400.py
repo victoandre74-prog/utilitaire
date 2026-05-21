@@ -1,4 +1,3 @@
-
 import pyodbc
 import pandas as pd
 
@@ -60,8 +59,8 @@ WHERE gpp.ARGRFS IN ('EXPCOL', 'F00358', 'F00360', 'F00370','F00380', 'F00390', 
 # ✅ RECUP DATA
 df= pd.read_sql_query(query, conn)
 df.columns = df.columns.str.strip().str.lower()
+df["volume"] = (df["hauteur"]*df["largeur"]*df["profondeur"])/1e6
 
-df["volume m3"] = (df["hauteur"]*df["largeur"]*df["profondeur"])/1e6
 # ✅ EXPORT
 df.to_excel("export.xlsx", index=False)
 
