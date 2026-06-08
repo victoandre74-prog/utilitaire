@@ -32,10 +32,11 @@ ORIENTATION_MAP = {
     "WxL,LxW,HxL,LxH,HxW,WxH":"all",
 }
 
+"""
 # === DICTIONNAIRE DE MATCH PRIORITE ===
 p_matrice = pd.read_csv("matrice_priority.csv",sep=";",header=None)
 priority_map = dict(zip(p_matrice[0], p_matrice[1]))
-                    
+"""                    
 
 for i in range(0,nb_files):
     # === FICHIERS ===
