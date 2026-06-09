@@ -1,15 +1,10 @@
 import pyodbc
 import pandas as pd
 
-def get_data_from_bdd_msql(server, database, sl) -> pd.DataFrame :
-
-    server = "10.24.10.114,1433"   # IMPORTANT : virgule et non ":"
-    database = "FOURNIER-HUB"
+def get_data_from_bdd_msql(server, database, query) -> pd.DataFrame :
 
     conn = None
 
-    sl = sl
-    
     try:
         # Connexion SQL Server (authentification Windows)
         conn = pyodbc.connect(
@@ -26,14 +21,20 @@ def get_data_from_bdd_msql(server, database, sl) -> pd.DataFrame :
         cursor = conn.cursor()
         cursor.execute("SELECT GETDATE()")
 
-        result = cursor.fetchone()
-        print("Date serveur :", result[0])
-
+        df= pd.read_sql_query(query, conn)
+        df.columns = df.columns.str.strip().str.lower()
+        
+        return df
+    
     except Exception as e:
         print("❌ Connexion refusée")
         print("Erreur:", e)
 
-    finally:
-        if conn:
-            conn.close()
-            print("🔌 Déconnexion effectuée")
+
+if __name__ == "__main__":
+    server = "10.24.10.114,1433"   # IMPORTANT : virgule et non ":"
+    database = "FOURNIER-HUB"
+    query = "SELECT * FROM your_table"
+
+    df = get_data_from_bdd_msql(server, database, query)
+    print(df)   
