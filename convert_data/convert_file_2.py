@@ -1,56 +1,65 @@
 import pandas as pd
 import os
 import random
+import param 
+import query
 
-# === CHEMINS ===
-input_folder = r"input"
+# === CHEMIN ===
 output_folder = r"output"
 
 DEFAULT_WEIGHT_MIN = 0.5
 DEFAULT_WEIGHT_MAX = 2.0
 
-nb_empty = 0
 nb_valid = 0
 nb_errors = 0
 
-# === GROUPES PRODUITS PRIORITÉ 1 ===
-PRIORITY_1_GROUPS = {
-    'F00358', 'F00360', 'F00370', 'F00380', 'F00390', 'F00391',
-    'F00392', 'F00393', 'F00394', 'F00395', 'F00396', 'F00400', 'F00LT3'
-}
+# === REQUETE SQL ===
+server = "10.24.10.114,1433"
+database = "FOURNIER-HUB"
 
-# === MATRICE DES ORIENTATIONS ===
-ORIENTATION_MAP = {
-    "HxL,LxH": "HLW,LHW",
-    "HxW,WxH": "HWL,WHL",
-    "WxL,LxW": "WLH,LWH",
-    "HxW,WxH,HxL,LxH": "HWL,WHL,HLW,LHW",
-    "HxL,LxH,HxW,WxH": "HWL,WHL,HLW,LHW",
-    "HxW,WxH,WxL,LxW": "HWL,WHL,WLH,LWH",
-    "WxL,LxW,HxW,WxH": "HWL,WHL,WLH,LWH",
-    "WxL,LxW,HxL,LxH": "WLH,LWH,HLW,LHW",
-    "HxL,LxH,WxL,LxW": "WLH,LWH,HLW,LHW",
-    "HxW,WxH,HxL,LxH,WxL,LxW": "all",
-    "HxW,WxH,WxL,LxW,HxL,LxH": "all",
-    "HxL,LxH,WxL,LxW,HxW,WxH": "all",
-    "HxL,LxH,HxW,WxH,WxL,LxW": "all",
-    "WxL,LxW,HxW,WxH,HxL,LxH": "all",
-    "WxL,LxW,HxL,LxH,HxW,WxH": "all",
-}
+# Dans convert_file_2.py ou param.py
+gp_sql = ", ".join(f"'{v}'" for v in param.GroupeProduit)
+cn_sql = ", ".join(f"'{v}'" for v in param.CodeNoeud)
+
+sql_query = f"""
+    SELECT DISTINCT
+        CodeNoeud, 
+        CONCAT(
+            NumeroAR,
+            '009',
+            RIGHT('0000' + CAST(NumeroLigneAR AS VARCHAR), 4),
+            RIGHT('0000' + CAST(SequenceAR AS VARCHAR), 2)
+        ) AS Id,
+        GroupeProduit,
+        Dimension1Emballe, 
+        Dimension2Emballe, 
+        Dimension3Emballe,
+        Poids,
+        Orientations, 
+        NumeroAR,
+        DESSOUS,
+        DESSUS,
+        Designation,
+        SemaineLivraison 
+    FROM [FOURNIER-DWH].u9.Fait_BDD_U9_SL_2024S17_2024S22
+    WHERE GroupeProduit IN ({gp_sql})
+        AND CodeNoeud IN ({cn_sql})
+    ORDER BY CodeNoeud ASC
+    """
 
 
 # === FONCTIONS UTILITAIRES ===
 
 def map_priority(groupe_produit: str) -> int:
     """Retourne 1 si le groupe produit est prioritaire, sinon 2."""
-    return 1 if str(groupe_produit).strip() in PRIORITY_1_GROUPS else 2
+    return 1 if str(groupe_produit).strip() in param.PRIORITY_1_GROUPS else 2
 
 
 def map_orientation(orientation: str) -> str:
     """Mappe l'orientation brute vers le format cible. Retourne 'error' si non trouvée."""
     if pd.isna(orientation) or str(orientation).strip() == "":
         return "error"
-    return ORIENTATION_MAP.get(str(orientation).strip(), "error")
+    return param.ORIENTATION_MAP.get(str(orientation).strip(), "error")
 
 def map_weight(poids) -> float:
     """Retourne un poids aléatoire entre 0.5 et 2.0 si poids <= 0, sinon retourne le poids."""
@@ -70,22 +79,10 @@ def map_stackable(dessus) -> bool:
         return False
 
 
-# === LECTURE DU FICHIER SOURCE ===
-source_files = [f for f in os.listdir(input_folder) if f.endswith(".csv")]
+df_source = query.get_data_from_bdd_msql(server = server, database = database, query = sql_query)
 
-if not source_files:
-    print("❌ Aucun fichier CSV trouvé dans le dossier input.")
-    exit(1)
+print(f"📂 Lecture des données OK")
 
-SOURCE_FILE = source_files[0]
-full_path_source = os.path.join(input_folder, SOURCE_FILE)
-
-print(f"📂 Lecture du fichier source : {SOURCE_FILE}")
-
-df_source = pd.read_csv(full_path_source, sep=";", dtype=str)
-
-# Nettoyage des espaces dans les noms de colonnes
-df_source.columns = df_source.columns.str.strip()
 
 # Vérification des colonnes attendues
 expected_cols = [
