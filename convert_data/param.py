@@ -1,4 +1,22 @@
-#--------------------------------------SQL
+#--------------------------------------SOURCE DES DONNÉES------------------------------------------------------------------
+
+# === MODE DE CHARGEMENT : "sql" ou "csv" ===
+DATA_SOURCE = "sql"  # ← changer ici
+
+# === CHEMIN DU FICHIER CSV (utilisé si DATA_SOURCE == "csv") ===
+CSV_SOURCE_PATH = r"input/mon_fichier.csv"
+
+# === CHEMIN DE SORTIE
+OUTPUT_FOLDER = r"output"
+
+# === CHEMIN DU FICHIER SQL ===
+SQL_FILE_PATH = r"sql/get_colis.sql"
+
+# === CONFIG SERVEUR REQUETE SQL ===
+SQL_SERVER = "10.24.10.114,1433"
+SQL_DATABASE = "FOURNIER-HUB"
+
+#--------------------------------------PARAMETRE CODE NOEUD GP PRODUIT REQUETE SQL-------------------------------------------
 
 # === CODENOEUD SELECTIONNE POUR REQUETE SQL ===
 
@@ -29,7 +47,11 @@ GroupeProduit = {
     "P00024","P00025","P00026","P09410","P09450",
 }
 
-#--------------------------------------CONVERSION
+#--------------------------------------REGLES DE CONVERSION----------------------------------------------------------------------
+
+# === LIMIT HAUTE BASSE DE POIDS POUR LE RANDOM SI POIDS NULL === 
+DEFAULT_WEIGHT_MIN = 0.5
+DEFAULT_WEIGHT_MAX = 2.0
 
 # === GROUPES PRODUITS PRIORITÉ 1 ===
 PRIORITY_1_GROUPS = {

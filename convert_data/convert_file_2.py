@@ -4,48 +4,32 @@ import random
 import param 
 import query
 
-# === CHEMIN ===
-output_folder = r"output"
-
-DEFAULT_WEIGHT_MIN = 0.5
-DEFAULT_WEIGHT_MAX = 2.0
-
 nb_valid = 0
 nb_errors = 0
 
-# === REQUETE SQL ===
-server = "10.24.10.114,1433"
-database = "FOURNIER-HUB"
+# === CHARGEMENT DE LA SOURCE ===
 
-# Dans convert_file_2.py ou param.py
-gp_sql = ", ".join(f"'{v}'" for v in param.GroupeProduit)
-cn_sql = ", ".join(f"'{v}'" for v in param.CodeNoeud)
+def load_data() -> pd.DataFrame:
+    """Charge les données selon le mode défini dans param.DATA_SOURCE."""
 
-sql_query = f"""
-    SELECT DISTINCT
-        CodeNoeud, 
-        CONCAT(
-            NumeroAR,
-            '009',
-            RIGHT('0000' + CAST(NumeroLigneAR AS VARCHAR), 4),
-            RIGHT('0000' + CAST(SequenceAR AS VARCHAR), 2)
-        ) AS Id,
-        GroupeProduit,
-        Dimension1Emballe, 
-        Dimension2Emballe, 
-        Dimension3Emballe,
-        Poids,
-        Orientations, 
-        NumeroAR,
-        DESSOUS,
-        DESSUS,
-        Designation,
-        SemaineLivraison 
-    FROM [FOURNIER-DWH].u9.Fait_BDD_U9_SL_2024S17_2024S22
-    WHERE GroupeProduit IN ({gp_sql})
-        AND CodeNoeud IN ({cn_sql})
-    ORDER BY CodeNoeud ASC
-    """
+    if param.DATA_SOURCE == "sql":
+        print("🔌 Mode SQL activé")
+        gp_sql    = ", ".join(f"'{v}'" for v in param.GroupeProduit)
+        cn_sql    = ", ".join(f"'{v}'" for v in param.CodeNoeud)
+        sql_query = query.load_sql_file(
+            param.SQL_FILE_PATH,
+            gp_sql=gp_sql,
+            cn_sql=cn_sql
+        )
+        return query.get_data_from_bdd_msql(param.SQL_SERVER, param.SQL_DATABASE, sql_query)
+
+    elif param.DATA_SOURCE == "csv":
+        print("📄 Mode CSV activé")
+        return query.get_data_from_csv(param.CSV_SOURCE_PATH)
+
+    else:
+        print(f"❌ DATA_SOURCE invalide : '{param.DATA_SOURCE}' (attendu : 'sql' ou 'csv')")
+        return pd.DataFrame()
 
 
 # === FONCTIONS UTILITAIRES ===
@@ -66,10 +50,10 @@ def map_weight(poids) -> float:
     try:
         p = float(poids)
         if p <= 0:
-            return round(random.uniform(DEFAULT_WEIGHT_MIN, DEFAULT_WEIGHT_MAX), 2)
+            return round(random.uniform(param.DEFAULT_WEIGHT_MIN, param.DEFAULT_WEIGHT_MAX), 2)
         return p
     except (ValueError, TypeError):
-        return round(random.uniform(DEFAULT_WEIGHT_MIN, DEFAULT_WEIGHT_MAX), 2)
+        return round(random.uniform(param.DEFAULT_WEIGHT_MIN, param.DEFAULT_WEIGHT_MAX), 2)
 
 def map_stackable(dessus) -> bool:
     """Retourne True si DESSUS == 1, False sinon."""
@@ -78,11 +62,12 @@ def map_stackable(dessus) -> bool:
     except (ValueError, TypeError):
         return False
 
+df_source = load_data()
+print(df_source.dtypes)
 
-df_source = query.get_data_from_bdd_msql(server = server, database = database, query = sql_query)
-
-print(f"📂 Lecture des données OK")
-
+if df_source.empty:
+    print("❌ Données vides, arrêt du programme.")
+    exit(1)
 
 # Vérification des colonnes attendues
 expected_cols = [
@@ -107,7 +92,7 @@ for (semaine, code_noeud), df_group in groups:
     code_noeud = str(code_noeud).strip()
 
     # --- Dossier de sortie par semaine ---
-    semaine_folder = os.path.join(output_folder, semaine)
+    semaine_folder = os.path.join(param.OUTPUT_FOLDER, semaine)
     os.makedirs(semaine_folder, exist_ok=True)
 
     # --- Nom du fichier de sortie ---
@@ -124,7 +109,7 @@ for (semaine, code_noeud), df_group in groups:
     df_out["height"]               = pd.to_numeric(df_group["Dimension3Emballe"], errors="coerce") / 10
     df_out["weight"]               = df_group["Poids"].apply(map_weight)
     df_out["allowed_orientations"] = df_group["Orientations"].apply(map_orientation)
-    df_out["client_id"]            = df_group["CodeNoeud"].str.strip()
+    df_out["client_id"]            = df_group["NumeroAR"].str.strip()
     df_out["stackable"]            = df_group["DESSUS"].apply(map_stackable)
     df_out["designation"]          = df_group["Designation"].fillna("").str.strip()
     df_out["location"]             = ""
